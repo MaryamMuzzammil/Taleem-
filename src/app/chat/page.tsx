@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api"; 
+import { useUser } from "@clerk/nextjs";
 
 export default function ChatPage() {
   const [input, setInput] = useState("");
@@ -10,13 +13,25 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const { user } = useUser(); // Clerk user
+  const saveMessage = useMutation(api.message.saveMessage); // Convex mutation
 
-    const newMessages = [...messages, { role: "user", content: input }];
-    setMessages(newMessages);
+  const sendMessage = async () => {
+    if (!input.trim() || !user) return;
+
+    const userMsg = { role: "user", content: input };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput("");
     setLoading(true);
+
+    // Save user message to Convex
+    await saveMessage({
+      userId: user.id,
+      role: "user",
+      content: input,
+      timestamp: Date.now(),
+    });
 
     try {
       const res = await fetch("/api/taleem", {
@@ -24,30 +39,47 @@ export default function ChatPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: updatedMessages }),
       });
 
-      if (!res.ok) throw new Error("Failed to fetch response.");
+      if (!res.ok) throw new Error("API error");
 
       const data = await res.json();
+      const aiReply = {
+        role: "assistant",
+        content: data.reply,
+      };
 
-      setMessages([...newMessages, { role: "assistant", content: data.reply }]);
-    } catch (error) {
-      console.error(error);
-      setMessages([
-        ...newMessages,
-        {
-          role: "assistant",
-          content:
-            "Sorry, TaleemBot is not responding right now. Please try again later.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
+      // Save AI message to Convex
+      await saveMessage({
+        userId: user.id,
+        role: "assistant",
+        content: data.reply,
+        timestamp: Date.now(),
+      });
+
+      setMessages([...updatedMessages, aiReply]);
+    } catch (err) {
+      const fallback = {
+        role: "assistant",
+        content:
+          "Sorry, TaleemBot is not responding right now. Please try again later.",
+      };
+
+      await saveMessage({
+        userId: user.id,
+        role: "assistant",
+        content: fallback.content,
+        timestamp: Date.now(),
+      });
+
+      setMessages([...updatedMessages, fallback]);
     }
+
+    setLoading(false);
   };
 
-  // Scroll to bottom on new message
+  // Auto-scroll
   useEffect(() => {
     chatRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -56,7 +88,6 @@ export default function ChatPage() {
     <div className="min-h-screen bg-zinc-900 text-white p-4">
       <h1 className="text-2xl font-bold mb-4 text-center">TaleemBot Chat</h1>
 
-      {/* Messages */}
       <div className="flex flex-col gap-3 mb-28">
         {messages
           .filter((msg) => msg.role !== "system")
@@ -81,7 +112,7 @@ export default function ChatPage() {
         <div ref={chatRef} />
       </div>
 
-      {/* Input Section */}
+      {/* Input section */}
       <div className="fixed bottom-4 left-0 right-0 px-4 max-w-2xl mx-auto flex gap-2">
         <input
           value={input}
