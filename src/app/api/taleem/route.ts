@@ -23,11 +23,16 @@ export async function POST(req: Request) {
 
     const reply = response.data.choices[0].message.content;
     return NextResponse.json({ reply });
-  } catch (error: any) {
+ } catch (error) {
+  if (axios.isAxiosError(error)) {
     console.error("TogetherAI Error:", error.response?.data || error.message);
-    return NextResponse.json(
-      { error: "TogetherAI API failed" },
-      { status: 500 }
-    );
+  } else {
+    console.error("Unexpected Error:", (error as Error).message);
   }
+
+  return NextResponse.json(
+    { error: "TogetherAI API failed" },
+    { status: 500 }
+  );
+}
 }
