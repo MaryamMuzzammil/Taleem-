@@ -60,6 +60,7 @@ export default function ChatPage() {
 
       setMessages([...updatedMessages, aiReply]);
     } catch (err) {
+       console.error("Error occurred:", err);
       const fallback = {
         role: "assistant",
         content:

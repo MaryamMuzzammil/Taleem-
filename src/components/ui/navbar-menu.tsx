@@ -2,6 +2,14 @@
 
 import React from "react";
 import { motion, Transition } from "framer-motion";
+import type { AnchorHTMLAttributes, DetailedHTMLProps } from "react";
+import Image from "next/image";
+
+// Type for <a> tag props
+type HoveredLinkProps = DetailedHTMLProps<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  HTMLAnchorElement
+>;
 
 const transition: Transition = {
   type: "spring",
@@ -85,11 +93,11 @@ export const ProductItem = ({
 }) => {
   return (
     <a href={href} className="flex space-x-2">
-      <img
+      <Image
         src={src}
+        alt={title}
         width={140}
         height={70}
-        alt={title}
         className="shrink-0 rounded-md shadow-2xl"
       />
       <div>
@@ -104,13 +112,7 @@ export const ProductItem = ({
   );
 };
 
-export const HoveredLink = ({
-  children,
-  ...rest
-}: {
-  children: React.ReactNode;
-  [key: string]: any;
-}) => {
+export const HoveredLink = ({ children, ...rest }: HoveredLinkProps) => {
   return (
     <a
       {...rest}
